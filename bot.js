@@ -3,6 +3,19 @@ const { execFile } = require('node:child_process');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
+const fsSync = require('node:fs');
+
+// Cookies (Instagram uchun): Render Secret File yoki lokal cookies.txt
+let COOKIES = null;
+for (const p of ['/etc/secrets/cookies.txt', path.join(__dirname, 'cookies.txt')]) {
+  try {
+    const dest = path.join(os.tmpdir(), 'cookies.txt');
+    fsSync.copyFileSync(p, dest); // yt-dlp faylga yozishi mumkin, shuning uchun nusxa olamiz
+    COOKIES = dest;
+    console.log('Cookies yuklandi:', p);
+    break;
+  } catch {}
+}
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
@@ -20,6 +33,7 @@ function download(url, dir) {
       '--max-filesize', '50M',
       '--playlist-end', '10',
       '--no-warnings',
+      ...(COOKIES ? ['--cookies', COOKIES] : []),
       url,
     ];
     execFile('yt-dlp', args, { timeout: 120000 }, (err, _out, stderr) => {
