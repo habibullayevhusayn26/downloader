@@ -29,6 +29,27 @@ function download(url, dir) {
   });
 }
 
+// Pinterest rasmlari uchun (yt-dlp faqat videoni yuklaydi)
+async function pinterestImage(url, dir) {
+  const headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36' };
+  const page = await fetch(url, { redirect: 'follow', headers });
+  const html = await page.text();
+  const m =
+    html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) ||
+    html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+  if (!m) throw new Error('og:image topilmadi');
+
+  const small = m[1].replace(/&amp;/g, '&');
+  const original = small.replace(/\/\d+x\//, '/originals/');
+
+  let res = await fetch(original, { headers });
+  if (!res.ok) res = await fetch(small, { headers });
+  if (!res.ok) throw new Error('Rasm yuklanmadi');
+
+  const ext = path.extname(new URL(small).pathname) || '.jpg';
+  await fs.writeFile(path.join(dir, 'pin' + ext), Buffer.from(await res.arrayBuffer()));
+}
+
 bot.command('start', (ctx) =>
   ctx.reply(
     "Salom! Instagram, TikTok, YouTube, Pinterest yoki Likee havolasini yuboring, men yuklab beraman."
@@ -45,7 +66,12 @@ bot.on('message:text', async (ctx) => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'dl-'));
 
   try {
-    await download(match[0], dir);
+    try {
+      await download(match[0], dir);
+    } catch (e) {
+      if (/pinterest\.|pin\.it/i.test(match[0])) await pinterestImage(match[0], dir);
+      else throw e;
+    }
     const files = (await fs.readdir(dir)).sort();
     if (!files.length) throw new Error('Fayl topilmadi');
 
